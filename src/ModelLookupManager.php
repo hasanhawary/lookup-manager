@@ -48,7 +48,11 @@ class ModelLookupManager
                 $select = $this->determineSelectFields($table);
 
                 // Apply scopes if any
-                $this->applyScopes($model, $table['scopes'] ?? [], $table['values'] ?? []);
+                $this->applyScopes(
+                    $model,
+                    Arr::wrap($table['scopes'] ?? []),
+                    Arr::wrap($table['values'] ?? [])
+                );
 
                 // Fetch data
                 $result[$tableName] = $model->select($select)
@@ -65,21 +69,23 @@ class ModelLookupManager
         return $result;
     }
 
-    private function applyScopes($model, $scopes, $values): void
+    private function applyScopes(&$model, $scopes = null, $values = null): void
     {
         if ($model instanceof User || $model instanceof Role) {
             if (method_exists($model, 'scopeExcludeRoot')) {
-                $model = $model->excludeRoot();
+                $model->excludeRoot();
             }
         }
 
-        if (empty($scopes)) return;
-
-        collect($scopes)->each(function ($scope, $index) use ($model, $values) {
-            if (method_exists($model, 'scope' . Str::studly($scope))) {
-                $model->$scope($values[$index] ?? null);
+        foreach (Arr::wrap($scopes) as $key => $scope) {
+            try {
+                $model = !isset($values[$key])
+                    ? $model->$scope()
+                    : $model->$scope(...Arr::wrap(@$values[$key]));
+            } catch (Exception|Error $e) {
+                Log::error("Error when applying scope {$scope}: " . $e->getMessage());
             }
-        });
+        }
     }
 
     private function determineSelectFields(array $table): array
