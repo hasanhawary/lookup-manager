@@ -173,17 +173,6 @@ Enums endpoint body (application/json):
 Notes:
 - HelpModelRequest and HelpEnumRequest are simple form requests that validate the input structure (e.g., that `tables`/`enums` are arrays). Adjust them to your needs.
 
----
-
-## 🧪 Testing
-
-This package includes a small test suite. From the project root:
-
-```bash
-vendor/bin/phpunit -c packages/lookup-manager/phpunit.xml
-```
-
----
 
 ## ✅ Version Support
 
