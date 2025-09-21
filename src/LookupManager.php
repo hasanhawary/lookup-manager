@@ -18,16 +18,16 @@ class LookupManager
     /**
      * Delegate to ModelLookupManager
      */
-    public function getModels(HelpModelRequest $request): array
+    public function getModels(array $data): array
     {
-        return $this->modelManager->getModels($request);
+        return $this->modelManager->getModels($data);
     }
 
     /**
      * Delegate to EnumLookupManager
      */
-    public function getEnums(HelpEnumRequest $request): array
+    public function getEnums(array $data): array
     {
-        return $this->enumManager->getEnums($request);
+        return $this->enumManager->getEnums($data);
     }
 }

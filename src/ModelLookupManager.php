@@ -2,39 +2,63 @@
 
 namespace HasanHawary\LookupManager;
 
-use App\Http\Requests\Global\Help\HelpModelRequest;
+use App\Models\Role;
+use App\Models\User;
 use Error;
 use Exception;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use RuntimeException;
 
 class ModelLookupManager
 {
     /**
      * Fetch model data according to the request definition.
      */
-    public function getModels(HelpModelRequest $request): array
+    public function getModels(array $request): array
     {
         $result = [];
 
-        foreach ($request->tables as $table) {
-            try {
-                when(!$model = $this->resolveModel($table['name'], @$table['module']), fn() => throw new \RuntimeException());
+        // Throw exception if 'tables' is missing or empty
+        $tables = $request['tables'] ?? null;
+        if (empty($tables) || !is_array($tables)) {
+            throw new RuntimeException("The 'tables' key is required and must be a non-empty array.");
+        }
 
+        foreach ($tables as $table) {
+            $tableName = $table['name'] ?? null;
+
+            if (!$tableName) {
+                Log::warning("Skipped a table without a 'name' key in request.");
+                continue; // skip if the table name is missing
+            }
+
+            try {
+                // Resolve model
+                $model = $this->resolveModel($tableName, $table['module'] ?? null);
+                if (!$model) {
+                    Log::warning("Model not found for table: {$tableName}");
+                    $result[$tableName] = [];
+                    continue;
+                }
+
+                // Determine select fields
                 $select = $this->determineSelectFields($table);
 
-                $this->applyScopes($model, @$table['scopes'], @$table['values']);
+                // Apply scopes if any
+                $this->applyScopes($model, $table['scopes'] ?? [], $table['values'] ?? []);
 
-                $result[$table['name']] = $model->select($select)
+                // Fetch data
+                $result[$tableName] = $model->select($select)
                     ->get()
                     ->transform(fn($record) => $this->transformRecord($record, $select))
                     ->toArray();
 
             } catch (Exception|Error $e) {
-                Log::error("Error when Getting model");
-                $result[$table['name']] = [];
+                Log::error("Error when getting model {$tableName}: " . $e->getMessage());
+                $result[$tableName] = [];
             }
         }
 
@@ -43,11 +67,17 @@ class ModelLookupManager
 
     private function applyScopes($model, $scopes, $values): void
     {
+        if ($model instanceof User || $model instanceof Role) {
+            if (method_exists($model, 'scopeExcludeRoot')) {
+                $model = $model->excludeRoot();
+            }
+        }
+
         if (empty($scopes)) return;
 
         collect($scopes)->each(function ($scope, $index) use ($model, $values) {
             if (method_exists($model, 'scope' . Str::studly($scope))) {
-                $model->$scope(@$values[$index]);
+                $model->$scope($values[$index] ?? null);
             }
         });
     }
@@ -57,15 +87,15 @@ class ModelLookupManager
         $select = Arr::wrap('id');
 
         if (!empty($table['extra'])) {
-            $select = collect(array_merge($select, Arr::wrap($table['extra'] ?? [])))->unique()->toArray();
+            $select = collect(array_merge($select, Arr::wrap($table['extra'])))->unique()->toArray();
         }
 
         $nameFields = ['display_name', 'title', 'label', 'name'];
-        $columns = Schema::getColumnListing($table['name']);
+        $columns = Schema::hasTable($table['name']) ? Schema::getColumnListing($table['name']) : [];
 
         foreach ($nameFields as $field) {
             if (in_array($field, $columns)) {
-                $select = array_merge($select, [$field]);
+                $select[] = $field;
                 break;
             }
         }
@@ -90,7 +120,8 @@ class ModelLookupManager
 
     private function resolveModel(string $name, $module): ?object
     {
-        $model = collect(explode('_', $name))->map(fn($i) => ucfirst(Str::camel($i)))->join('');
+        $model = collect(explode('_', $name))
+            ->map(fn($i) => ucfirst(Str::camel(Str::singular($i))))->join('');
 
         $modelPath = !empty($module)
             ? "Modules\\" . ucfirst(Str::camel($module)) . "\\App\\Models\\{$model}"
