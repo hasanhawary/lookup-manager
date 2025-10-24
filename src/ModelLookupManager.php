@@ -95,9 +95,11 @@ class ModelLookupManager
         if (!empty($table['extra'])) {
             $select = collect(array_merge($select, Arr::wrap($table['extra'])))->unique()->toArray();
         }
+        
+        $table = Str::plural($table['name']);
 
         $nameFields = ['display_name', 'title', 'label', 'name'];
-        $columns = Schema::hasTable($table['name']) ? Schema::getColumnListing($table['name']) : [];
+        $columns = Schema::hasTable($table) ? Schema::getColumnListing($table) : [];
 
         foreach ($nameFields as $field) {
             if (in_array($field, $columns)) {
