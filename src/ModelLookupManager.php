@@ -118,7 +118,7 @@ class ModelLookupManager
         $map = ['display_name', 'title', 'label', 'name'];
         foreach ($map as $field) {
             if (isset($data[$field])) {
-                $data['name'] = $data[$field];
+                $data['name'] = $record->{$field} ?? '';
                 break;
             }
         }
