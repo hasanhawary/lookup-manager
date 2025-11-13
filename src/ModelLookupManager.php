@@ -15,13 +15,24 @@ use RuntimeException;
 class ModelLookupManager
 {
     /**
+     * Preferred name-related fields in order of priority.
+     */
+    private const NAME_FIELDS = [
+        'display_name',
+        'title',
+        'label',
+        'name',
+        'first_name',
+        'last_name',
+    ];
+
+    /**
      * Fetch model data according to the request definition.
      */
     public function getModels(array $request): array
     {
         $result = [];
 
-        // Throw exception if 'tables' is missing or empty
         $tables = $request['tables'] ?? null;
         if (empty($tables) || !is_array($tables)) {
             throw new RuntimeException("The 'tables' key is required and must be a non-empty array.");
@@ -36,7 +47,6 @@ class ModelLookupManager
             }
 
             try {
-                // Resolve model
                 $model = $this->resolveModel($tableName, $table['module'] ?? null);
                 if (!$model) {
                     Log::warning("Model not found for table: {$tableName}");
@@ -44,10 +54,14 @@ class ModelLookupManager
                     continue;
                 }
 
+                // TODO [Security]: Enforce permission check before accessing this model.
+                //  - Some models may require explicit permissions (e.g., 'view-users', 'view-finance').
+                //  - Implement a check like: $this->authorizeModelAccess($model, $user);
+                //  - Deny access if user lacks required permissions or role.
+
                 // Determine select fields
                 $select = $this->determineSelectFields($table);
 
-                // Apply scopes if any
                 $this->applyScopes(
                     $model,
                     Arr::wrap($table['scopes'] ?? []),
@@ -73,55 +87,82 @@ class ModelLookupManager
     {
         if ($model instanceof User || $model instanceof Role) {
             if (method_exists($model, 'scopeExcludeRoot')) {
-                $model->excludeRoot();
+                $model = $model->excludeRoot();
             }
         }
 
         foreach (Arr::wrap($scopes) as $key => $scope) {
             try {
-                $model = !isset($values[$key])
-                    ? $model->$scope()
-                    : $model->$scope(...Arr::wrap(@$values[$key]));
+                if (!method_exists($model, $scope)) {
+                    Log::warning("Scope method '{$scope}' not found on model " . get_class($model));
+                    continue;
+                }
+
+                // Determine matching value
+                $value = $values[$scope] ?? $values[$key] ?? null;
+
+                $model = !empty($value)
+                    ? $model->$scope(...Arr::wrap($value))
+                    : $model->$scope();
+
             } catch (Exception|Error $e) {
-                Log::error("Error when applying scope {$scope}: " . $e->getMessage());
+                Log::error("Error applying scope '{$scope}' on model " . get_class($model) . ": " . $e->getMessage());
+                continue;
             }
         }
     }
 
     private function determineSelectFields(array $table): array
     {
-        $select = Arr::wrap('id');
+        $select = ['id'];
 
         if (!empty($table['extra'])) {
-            $select = collect(array_merge($select, Arr::wrap($table['extra'])))->unique()->toArray();
+            // TODO [Security]: Before merging extra fields, validate that each field is allowed to be selected.
+            //  - Prevent exposing locked or restricted columns (e.g., password, api_key, tokens, salary, etc.)
+            //  - Consider checking against a whitelist or permission-based access control.
+            //  - Example: $this->validateSelectableColumns($table['extra'], $userPermissions);
+            $select = array_merge($select, Arr::wrap($table['extra']));
         }
 
-        $nameFields = ['display_name', 'title', 'label', 'name'];
-        $columns = Schema::hasTable($table['name']) ? Schema::getColumnListing($table['name']) : [];
+        $columns = Schema::hasTable($table['name'])
+            ? Schema::getColumnListing($table['name'])
+            : [];
 
-        foreach ($nameFields as $field) {
+        foreach (self::NAME_FIELDS as $field) {
             if (in_array($field, $columns)) {
                 $select[] = $field;
                 break;
             }
         }
 
-        return array_unique($select);
+        return array_values(array_unique($select));
     }
 
     private function transformRecord($record, array $select): array
     {
-        $data = Arr::only($record->toArray(), $select);
+        $data = [
+            'id' => $record->id ?? null,
+        ];
 
-        $map = ['display_name', 'title', 'label', 'name'];
-        foreach ($map as $field) {
-            if (isset($data[$field])) {
-                $data['name'] = $data[$field];
-                break;
+        // Determine name value from available name fields
+        $data['name'] = $record->name
+            ?? $record->title
+            ?? $record->display_name
+            ?? $record->full_name
+            ?? $record->label
+            ?? ($record->first_name && $record->last_name
+                ? trim("{$record->first_name} {$record->last_name}")
+                : null);
+
+        // Include valid extra fields
+        $extraFields = array_diff($select, array_merge(['id'], self::NAME_FIELDS));
+        foreach ($extraFields as $field) {
+            if (isset($record->{$field})) {
+                $data[$field] = $record->{$field};
             }
         }
 
-        return Arr::only($data, ['id', 'name', ...array_values(array_diff($select, ['id']))]);
+        return $data;
     }
 
     private function resolveModel(string $name, $module): ?object

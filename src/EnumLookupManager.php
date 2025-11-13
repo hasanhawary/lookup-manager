@@ -5,6 +5,7 @@ namespace HasanHawary\LookupManager;
 use Error;
 use Illuminate\Support\Str;
 use RuntimeException;
+use Illuminate\Support\Facades\Log;
 
 class EnumLookupManager
 {
@@ -37,12 +38,21 @@ class EnumLookupManager
                 throw new RuntimeException("Enum class not found: {$enumPath}");
             }
 
+            $method = !empty($enum['method'])
+                ? Str::camel($enum['method'])
+                : 'getList';
+
             try {
-                return [$enum['name'] => $enumPath::getList()];
-            } catch (\Exception|Error $e) {
-                // Log error but return empty array for this enum
-                return [$enum['name'] => []];
+                // Call the static method dynamically
+                return [
+                    $enum['name'] => $enumPath::$method(),
+                ];
+            } catch (\Throwable $e) {
+                Log::error("Failed to get enum [{$enum['name']}] using {$enumPath}::{$method}(): {$e->getMessage()}");
+
+                return [ $enum['name'] => []];
             }
+
         })->toArray();
     }
 

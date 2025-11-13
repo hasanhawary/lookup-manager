@@ -47,7 +47,8 @@ trait EnumMethods
                         'value' => $value,
                         'label' => $labelValue,
                         'snake_key' => $labelKey,
-                        'icon' => method_exists(__class__, 'icon') ? self::icons()[$value] : null,
+                        'extra' => method_exists(__class__, 'extra') ? (self::extra()[$value] ?? null) : null,
+                        'icon' => method_exists(__class__, 'icon') ? (self::icons()[$value] ?? null) : null,
                     ];
                 })->values()->toArray();
 
