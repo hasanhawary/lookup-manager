@@ -124,6 +124,8 @@ class ModelLookupManager
             $select = array_merge($select, Arr::wrap($table['extra']));
         }
 
+        $table = Str::plural($table['name']);
+
         $columns = Schema::hasTable($table['name'])
             ? Schema::getColumnListing($table['name'])
             : [];
