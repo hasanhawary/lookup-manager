@@ -5,7 +5,7 @@
 [![PHP Version](https://img.shields.io/packagist/php-v/hasanhawary/lookup-manager.svg)](https://packagist.org/packages/hasanhawary/lookup-manager)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-A clean, framework-friendly lookup utility for **Laravel** applications, enabling **dynamic model lookups**, **enum discovery**, and **translation-aware enum lists**.
+A lightweight, framework-friendly **Laravel** package for dynamic **model lookups**, **enum discovery**, and **translation-aware enum lists**.
 
 ---
 
@@ -13,27 +13,43 @@ A clean, framework-friendly lookup utility for **Laravel** applications, enablin
 
 ### Model Lookup Features
 
-* Fetch lookup lists from **Eloquent models** dynamically using `Lookup::getModels()`.
-* Apply **Eloquent scopes** with optional parameters (model methods only).
-* Select **extra fields** beyond default `id` and name fields.
+* Fetch dynamic lookup lists from **Eloquent models** with `Lookup::getModels()`.
+* Apply **Eloquent scopes** with optional parameters.
+* Include **extra fields** beyond `id` and default name fields.
 * Automatic **name mapping** using prioritized fields:
-  `display_name`, `title`, `label`, `name`, `first_name`, `last_name`.
-* Supports **searching/filtering** within model records:
 
-  * Accepts a **string** or **array with `'term'` and optional `'fields'`**.
-  * Defaults to `display_name`, `title`, `label`, `name`, `first_name`, `last_name` if fields are not provided.
-* Supports **pagination** with custom `per_page` and `page` numbers.
-* Handles **module-based models**: `Modules\{Module}\App\Models\{Model}`.
-* Special handling for `User` and `Role` models (`excludeRoot()` automatically applied).
-* Error handling and logging for missing models, scopes, or runtime errors.
-* Transforms results into standardized structure:
+  ```
+  display_name → title → label → name → first_name + last_name
+  ```
+* **Custom name field override** via `$helpModelName` property on any model:
+
+```php
+class Country extends Model {
+    public $helpModelName = 'code'; // 'name' in lookups will use 'code' field
+}
+```
+
+* Supports **searching/filtering**:
+
+  * Accepts a **string** or an **array** with `'term'` and optional `'fields'`.
+  * Defaults to name fields if `'fields'` not provided.
+
+* Supports **pagination** with `per_page` and `page`.
+
+* Works with **module-based models**: `Modules\{Module}\App\Models\{Model}`.
+
+* Special handling for `User` and `Role` models (`excludeRoot()` applied automatically).
+
+* Graceful error handling and logging for missing models, invalid scopes, or runtime errors.
+
+* Transforms results into **standardized arrays**:
 
 ```php
 [
     'id' => 1,
-    'name' => 'John Doe',
-    'email' => 'john@example.com', // extra fields
-    ...
+    'name' => 'EG',      // from $helpModelName = 'code'
+    'code' => 'EG',      // extra field
+    'iso' => 'EGY',      // extra field
 ]
 ```
 
@@ -41,12 +57,13 @@ A clean, framework-friendly lookup utility for **Laravel** applications, enablin
 
 ### Enum Lookup Features
 
-* Discover enums in **`app/Enum/**`** or **`Modules/*/App/Enum/**`** automatically.
-* Fetch specific enums using **dot notation** (`user.status` → `App\Enum\User\StatusEnum`).
+* Automatically discovers enums in `app/Enum/**` or `Modules/*/App/Enum/**`.
+* Fetch specific enums using **dot notation**:
+  `'user.status'` → `App\Enum\User\StatusEnum`.
 * Supports **module-based enums**: `Modules\Blog\App\Enum\BarEnum`.
-* Call **default `getList()`** or **any custom static method** in your Enum using `Lookup::getEnums()`.
-* Returns **structured arrays with keys, values, labels, snake_keys, icons, and extra data**.
-* Automatically logs errors if an enum class or method is missing.
+* Call **default `getList()`** or any **custom static method** using `Lookup::getEnums()`.
+* Returns fully structured arrays including: `key`, `value`, `label`, `snake_key`, `icon`, `extra`.
+* Logs errors if the enum class or method is missing.
 
 Example return:
 
@@ -59,17 +76,25 @@ Example return:
 
 ---
 
-### EnumMethods Trait Features
+### Enum Helper Methods (`EnumMethods` Trait)
 
-* Static helper methods for Enum classes:
+For any Enum using the `EnumMethods` trait:
 
-  * `getList()` → returns full list with `key`, `value`, `label`, `snake_key`, `icon`, `extra`.
-  * `resolve($value, $trans = true)` → returns translated label or raw key/value.
-  * `values()` → returns array of all enum values.
-  * `commentFormat()` → returns string for comments/documentation.
-* Supports **translation integration** via `__('enums.*')`.
-* Can include extra meta like `icon()` and `extra()` per enum value.
-* Handles numeric and string keys automatically with snake_case normalization.
+```php
+use App\Enum\User\StatusEnum;
+
+// Get full translated list
+StatusEnum::getList();
+
+// Resolve a single value
+StatusEnum::resolve(1); // returns 'Active'
+
+// Get all enum values
+StatusEnum::values(); // [1, 0]
+
+// Generate comment-friendly format
+StatusEnum::commentFormat(); // "1 => Active, 0 => Inactive"
+```
 
 ---
 
@@ -79,7 +104,7 @@ Example return:
 composer require hasanhawary/lookup-manager
 ```
 
-* Auto-discovers service provider.
+* Auto-discovers the service provider.
 * **Facade alias**: `Lookup` → `HasanHawary\LookupManager\Facades\Lookup`.
 
 ---
@@ -93,28 +118,47 @@ use HasanHawary\LookupManager\Facades\Lookup;
 
 $models = Lookup::getModels([
     [
-        'name'   => 'users',
-        'scopes' => ['active'],          // only model scopes
-        'extra'  => ['email'],          
-        'paginate' => true,              // optional; defaults to all data
-        'per_page' => 20,                // optional; defaults to 15
-        'page' => 1,                     // optional
-        'search' => [                    // search within model records
-            'term' => 'John',
-            'fields' => ['name', 'email'] // optional; defaults to name fields
+        'name'      => 'countries',
+        'scopes'    => ['active'],           // model scopes only
+        'extra'     => ['code', 'iso'],      // additional fields
+        'paginate'  => true,
+        'per_page'  => 15,
+        'page'      => 1,
+        'search'    => [
+            'term'   => 'Eg',
+            'fields' => ['name', 'code']    // optional, defaults to name fields
         ]
     ],
     [
-        'name' => 'roles',  // simple call
+        'name' => 'roles',  // simple lookup
     ],
 ]);
 ```
 
-**Notes:**
+---
 
-* `scopes` are strictly **model scopes**.
-* Supports **search/filter** on specified fields or default name fields.
-* Automatically maps name fields and includes extra fields.
+### Custom Name Fields with `$helpModelName`
+
+If your model defines a `$helpModelName` property, Lookup Manager will **prefer this field for the `name` key**:
+
+```php
+class Country extends Model
+{
+    public $helpModelName = 'code';
+}
+```
+
+Output:
+
+```php
+[
+    'id' => 1,
+    'name' => 'EG', // from helpModelName
+    'code' => 'EG',
+]
+```
+
+**Fallback behavior:** If `$helpModelName` is not defined, Lookup Manager will use the prioritized default name fields (`display_name`, `title`, `label`, `name`, `first_name + last_name`).
 
 ---
 
@@ -124,7 +168,7 @@ $models = Lookup::getModels([
 use HasanHawary\LookupManager\Facades\Lookup;
 
 $enums = Lookup::getEnums([
-    ['name' => 'user.status'],           // App\Enum\User\StatusEnum::getList()
+    ['name' => 'user.status'],            // App\Enum\User\StatusEnum::getList()
     ['name' => 'user.roles', 'method' => 'getOptions'], // custom method
     ['name' => 'bar', 'module' => 'blog'], // Modules\Blog\App\Enum\BarEnum::getList()
 ]);
@@ -132,55 +176,12 @@ $enums = Lookup::getEnums([
 // Or fetch all enums automatically:
 $allEnums = Lookup::getEnums();
 ```
----
-
-### Enum Helper Methods
-
-For any Enum using the `EnumMethods` trait, you can use:
-
-```php
-use App\Enum\User\StatusEnum;
-
-// Get translated list
-StatusEnum::getList();
-/*
-[
-    ['key' => 'ACTIVE', 'value' => 1, 'label' => 'Active', 'snake_key' => 'active', 'icon' => 'check', 'extra' => null],
-    ['key' => 'INACTIVE', 'value' => 0, 'label' => 'Inactive', 'snake_key' => 'inactive', 'icon' => 'close', 'extra' => null],
-]
-*/
-
-// Resolve a value
-StatusEnum::resolve(1); // returns 'Active' (translated)
-StatusEnum::resolve(0); // returns 'Inactive'
-
-// Get values only
-StatusEnum::values(); // [1, 0]
-
-// Comment-friendly format
-StatusEnum::commentFormat(); // "1 => Active, 0 => Inactive"
-```
-
-**Notes:**
-
-* `getList()` → full structured array with key, value, label, snake_key, icon, extra.
-* `resolve($value)` → translated label by value or key.
-* `values()` → array of enum values only.
-* `commentFormat()` → convenient string for documentation or migrations.
 
 ---
 
-**Features:**
+## 🌐 HTTP API Usage
 
-* Can call **default `getList()`** or **any custom static method** in your Enum.
-* Works for Enums in **app/Enum** or **Modules/*/App/Enum**.
-* Returns **fully structured arrays** including labels, keys, snake_keys, icons, and extra data.
-
----
-
-## 🌐 Use as HTTP API
-
-* **Routes (api.php)**:
+* **Routes (`api.php`)**:
 
 ```php
 Route::prefix('help')->name('help.')->group(function () {
@@ -206,15 +207,23 @@ class HelpController extends Controller
 }
 ```
 
-* **Example requests**
+* **Example request payloads**:
 
 Models:
 
 ```json
 {
   "tables": [
-    { "name": "users", "scopes": ["active"], "extra": ["email"], "paginate": true, "per_page": 15, "page": 1, "search": {"term": "John", "fields": ["name", "email"]} },
-    { "name": "roles" }
+    {
+      "name": "users",
+      "scopes": ["active"],
+      "extra": ["email"],
+      "paginate": true,
+      "per_page": 15,
+      "page": 1,
+      "search": {"term": "John", "fields": ["name", "email"]}
+    },
+    {"name": "roles"}
   ]
 }
 ```
@@ -224,8 +233,8 @@ Enums:
 ```json
 {
   "enums": [
-    { "name": "user.status" },
-    { "name": "bar", "module": "blog" }
+    {"name": "user.status"},
+    {"name": "bar", "module": "blog"}
   ]
 }
 ```

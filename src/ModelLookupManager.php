@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use RuntimeException;
+use Illuminate\Database\Eloquent\Model;
 
 class ModelLookupManager
 {
@@ -60,7 +61,7 @@ class ModelLookupManager
                 //  - Deny access if user lacks required permissions or role.
 
                 // Determine select fields
-                $select = $this->determineSelectFields($table);
+                $select = $this->determineSelectFields($table, $model);
 
                 // Apply scopes
                 $this->applyScopes(
@@ -117,7 +118,8 @@ class ModelLookupManager
                 // Determine matching value
                 $value = $values[$scope] ?? $values[$key] ?? null;
 
-                $model = !empty($value)
+                // allow 0/"0"/false as valid values — only treat null as absent
+                $model = $value !== null
                     ? $model->$scope(...Arr::wrap($value))
                     : $model->$scope();
 
@@ -142,9 +144,14 @@ class ModelLookupManager
         }
 
         $table = $model->getModel()->getTable();
+
+        // Pass the actual model instance to determineSelectFields when used as fallback
         $fields = ($isArray && !empty($search['fields']))
             ? Arr::wrap($search['fields'])
-            : $this->determineSelectFields(['name' => $table]);
+            : $this->determineSelectFields(['name' => $table], $model->getModel());
+
+        // exclude 'id' from searchable fields
+        $fields = array_values(array_filter(Arr::wrap($fields), fn($f) => $f !== 'id'));
 
         $term = $isString ? $search : $search['term'];
 
@@ -159,24 +166,40 @@ class ModelLookupManager
         });
     }
 
-    private function determineSelectFields(array $table): array
+    private function determineSelectFields(array $table, $model): array
     {
         $select = ['id'];
 
+        // Get table columns safely
+        $tableName = Str::plural($table['name']);
+        $columns = Schema::hasTable($tableName)
+            ? Schema::getColumnListing($tableName)
+            : [];
+
+        // Include extra fields if provided
         if (!empty($table['extra'])) {
             // TODO [Security]: Before merging extra fields, validate that each field is allowed to be selected.
             //  - Prevent exposing locked or restricted columns (e.g., password, api_key, tokens, salary, etc.)
             //  - Consider checking against a whitelist or permission-based access control.
             //  - Example: $this->validateSelectableColumns($table['extra'], $userPermissions);
-            $select = array_merge($select, Arr::wrap($table['extra']));
+            $extra = Arr::wrap($table['extra']);
+
+            // Ensure extra column in list of columns
+            $select = array_merge($select, array_intersect($extra, $columns));
         }
 
-        $table = Str::plural($table['name']);
+        // Select helpModelName column(s) if defined in the model
+        if (property_exists($model, 'helpModelName') && $model->helpModelName) {
+            $help = $model->helpModelName;
 
-        $columns = Schema::hasTable($table)
-            ? Schema::getColumnListing($table)
-            : [];
+            foreach (Arr::wrap($help) as $field) {
+                if (in_array($field, $columns)) {
+                    $select[] = $field;
+                }
+            }
+        }
 
+        // Add default name fields
         foreach (self::NAME_FIELDS as $field) {
             if (in_array($field, $columns)) {
                 $select[] = $field;
@@ -194,17 +217,45 @@ class ModelLookupManager
         ];
 
         // Determine name value from available name fields
-        $data['name'] = $record->name
-            ?? $record->title
-            ?? $record->display_name
-            ?? $record->full_name
-            ?? $record->label
-            ?? (isset($record->first_name) && isset($record->last_name)
-                ? trim("{$record->first_name} {$record->last_name}")
-                : null);
+        $nameModel = null;
+
+        // check if property exists on the model instance
+        if (property_exists($record, 'helpModelName')) {
+            $nameModel = $record->helpModelName;
+        } else {
+            $recordClass = get_class($record);
+
+            if (property_exists($recordClass, 'helpModelName')) {
+                try {
+                    $nameModel = $recordClass::$helpModelName ?? null;
+                } catch (\Throwable $e) {
+                    $nameModel = null;
+                }
+            }
+        }
+
+
+        // If nameModel is defined and refers to one or more columns, build name using those columns' values
+        if ($nameModel) {
+            if (is_array($nameModel)) {
+                $values = array_map(fn($col) => $record->{$col} ?? '', $nameModel);
+                $data['name'] = $this->resolveModelName($values);
+            } else {
+                $data['name'] = $this->resolveModelName($record->{$nameModel} ?? '');
+            }
+        } else {
+            $data['name'] = $this->resolveDefaultName($record);
+        }
 
         // Include valid extra fields
         $extraFields = array_diff($select, array_merge(['id'], self::NAME_FIELDS));
+
+        // if we used a helpModelName field as the name, exclude it from extras to avoid duplication
+        if ($nameModel) {
+            $helpFields = Arr::wrap($nameModel);
+            $extraFields = array_values(array_filter($extraFields, fn($f) => !in_array($f, $helpFields)));
+        }
+
         foreach ($extraFields as $field) {
             if (isset($record->{$field})) {
                 $data[$field] = $record->{$field};
@@ -224,5 +275,26 @@ class ModelLookupManager
             : "App\\Models\\{$model}";
 
         return class_exists($modelPath) ? new $modelPath() : null;
+    }
+
+    private function resolveDefaultName($record)
+    {
+        return $record->name
+            ?? $record->title
+            ?? $record->display_name
+            ?? $record->full_name
+            ?? $record->label
+            ?? (
+                isset($record->first_name, $record->last_name)
+                    ? trim("{$record->first_name} {$record->last_name}")
+                    : null
+            );
+    }
+
+    private function resolveModelName(array|string $column)
+    {
+        return is_array($column)
+            ? implode(' ', $column)
+            : $column;
     }
 }
