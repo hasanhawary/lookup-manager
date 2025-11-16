@@ -62,17 +62,33 @@ class ModelLookupManager
                 // Determine select fields
                 $select = $this->determineSelectFields($table);
 
+                // Apply scopes
                 $this->applyScopes(
                     $model,
                     Arr::wrap($table['scopes'] ?? []),
                     Arr::wrap($table['values'] ?? [])
                 );
 
+                // Apply search filters
+                $this->applySearch(
+                    $model,
+                    $table['search'] ?? null,
+                );
+
                 // Fetch data
-                $result[$tableName] = $model->select($select)
-                    ->get()
-                    ->transform(fn($record) => $this->transformRecord($record, $select))
-                    ->toArray();
+                $result[$tableName] = $model->select($select);
+
+                $isPaginated = $table['paginate'] ?? false;
+                $perPage = $table['per_page'] ?? 15;
+                $page = $table['page'] ?? 1;
+                $query = $model;
+
+                $transform = fn ($record) => $this->transformRecord($record, $select);
+
+                $result[$tableName] = $isPaginated
+                    ? $query->paginate($perPage, page: $page)->through($transform)->toArray()
+                    : $query->get()->map($transform)->toArray();
+
 
             } catch (Exception|Error $e) {
                 Log::error("Error when getting model {$tableName}: " . $e->getMessage());
@@ -112,6 +128,37 @@ class ModelLookupManager
         }
     }
 
+    private function applySearch(&$model, array|string|null $search): void
+    {
+        if(!$search) {
+            return;
+        }
+
+        $isArray = is_array($search) && isset($search['term']) && !empty($search['term']);
+        $isString = is_string($search) && !empty($search);
+
+        if(!$isString && !$isArray) {
+            return;
+        }
+
+        $table = $model->getModel()->getTable();
+        $fields = ($isArray && !empty($search['fields']))
+            ? Arr::wrap($search['fields'])
+            : $this->determineSelectFields(['name' => $table]);
+
+        $term = $isString ? $search : $search['term'];
+
+        if (empty($term) || empty($fields)) {
+            return;
+        }
+
+        $model = $model->where(function ($query) use ($term, $fields) {
+            foreach ($fields as $field) {
+                $query->orWhere($field, 'LIKE', '%' . $term . '%');
+            }
+        });
+    }
+
     private function determineSelectFields(array $table): array
     {
         $select = ['id'];
@@ -126,8 +173,8 @@ class ModelLookupManager
 
         $table = Str::plural($table['name']);
 
-        $columns = Schema::hasTable($table['name'])
-            ? Schema::getColumnListing($table['name'])
+        $columns = Schema::hasTable($table)
+            ? Schema::getColumnListing($table)
             : [];
 
         foreach (self::NAME_FIELDS as $field) {
@@ -152,7 +199,7 @@ class ModelLookupManager
             ?? $record->display_name
             ?? $record->full_name
             ?? $record->label
-            ?? ($record->first_name && $record->last_name
+            ?? (isset($record->first_name) && isset($record->last_name)
                 ? trim("{$record->first_name} {$record->last_name}")
                 : null);
 
