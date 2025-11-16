@@ -159,11 +159,22 @@ class ModelLookupManager
             return;
         }
 
-        $model = $model->where(function ($query) use ($term, $fields) {
+        $model = $model->where(function ($query) use ($term, $fields, $model) {
+            // Get translatable fields dynamically
+            $jsonFields = property_exists($model, 'translatable') ? $model->translatable : [];
+
             foreach ($fields as $field) {
-                $query->orWhere($field, 'LIKE', '%' . $term . '%');
+                if (in_array($field, $jsonFields)) {
+                    // For spatie/laravel-translatable, you can search any locale like this
+                    foreach (config('app.supported_languages', ['ar', 'en']) as $locale) {
+                        $query->orWhere($field . '->' . $locale, 'LIKE', '%' . $term . '%');
+                    }
+                } else {
+                    $query->orWhere($field, 'LIKE', '%' . $term . '%');
+                }
             }
         });
+
     }
 
     private function determineSelectFields(array $table, $model): array
