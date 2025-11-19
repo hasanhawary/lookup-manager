@@ -4,58 +4,71 @@ namespace HasanHawary\LookupManager\Trait;
 
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
-use function Laravel\Prompts\select;
 
 trait EnumMethods
 {
-    /**
-     * Retrieves a list of enumerated values and their corresponding labels.
-     *
-     * @return array An associative array containing the enumerated values and their labels.
-     *
-     * If an exception or error occurs during the retrieval process, an empty array is returned.
-     */
+    public static function getLabelKey($key, $value): string
+    {
+        return is_numeric($value)
+            ? (ctype_upper($key) || \count(explode('_', $key)) > 1
+                ? strtolower($key)
+                : Str::snake($key))
+            : Str::snake($value);
+    }
+
+    public static function getKeyName(): string
+    {
+        return method_exists(__CLASS__, 'keyName')
+            ? self::keyName()
+            : Str::of(class_basename(self::class))
+                ->snake()
+                ->replaceLast('_enum', '')
+                ->toString();
+    }
+
+    public static function getExtraData(string $value, array|string|null $extra): array|null
+    {
+        if ($extra !== null) {
+            return $extra;
+        }
+
+        return method_exists(__CLASS__, 'extra') ? (self::extra()[$value] ?? null) : null;
+    }
+
+    public static function format($key, $value, $extra = null): array
+    {
+        $labelKey = self::getLabelKey($key, $value);
+
+        $keyName = self::getKeyName();
+
+        $fullKeyPath = __("enums.$keyName.$labelKey");
+
+        $labelValue = Str::startsWith($fullKeyPath, 'enums.') ? $labelKey : $fullKeyPath;
+
+        return [
+            'key' => $key,
+            'value' => $value,
+            'label' => $labelValue,
+            'snake_key' => $labelKey,
+            'extra' => self::getExtraData($value, $extra),
+            'icon' => method_exists(__CLASS__, 'icon') ? (self::icons()[$value] ?? null) : null,
+        ];
+    }
+
     public static function getList(): array
     {
-        try {
-            return collect(array_combine(array_column(self::cases(), 'value'), array_column(self::cases(), 'name')))
-                ->map(function ($key, $value) {
+        $data = array_combine(array_column(self::cases(), 'value'), array_column(self::cases(), 'name'));
 
-                    // If the value is numeric, convert it to lowercase and snake_case it
-                    if (is_numeric($value)) {
-                        $labelKey = ctype_upper($key) || count(explode('_', $key)) > 1
-                            ? strtolower($key)
-                            : Str::snake($key);
-                    } else {
-                        $labelKey = Str::snake($value);
-                    }
+        return collect($data)->map(
+            fn ($key, $value) => self::format($key, $value)
+        )->values()->toArray();
+    }
 
-                    // Check if the key exists in the translation file
-                    $keyName = method_exists(__class__, 'keyName')
-                        ? self::keyName()
-                        : Str::of(class_basename(self::class))
-                            ->snake()
-                            ->replaceLast('_enum', '')
-                            ->toString();
-
-                    // Translate the key and return the result
-                    $fullKeyPath = __("enums.$keyName.$labelKey");
-                    $labelValue = Str::startsWith($fullKeyPath, 'enums.') ? $labelKey : $fullKeyPath;
-
-                    return [
-                        'key' => $key,
-                        'value' => $value,
-                        'label' => $labelValue,
-                        'snake_key' => $labelKey,
-                        'extra' => method_exists(__class__, 'extra') ? (self::extra()[$value] ?? null) : null,
-                        'icon' => method_exists(__class__, 'icon') ? (self::icons()[$value] ?? null) : null,
-                    ];
-                })->values()->toArray();
-
-        } catch (\Exception|\Error $e) {
-            logError($e);
-            return [];
-        }
+    public static function formatWithExtra(array $data): array
+    {
+        return collect($data)->map(
+            fn($value, $key) => self::format((self::from($key))->name, $key, $value)
+        )->values()->toArray();
     }
 
     /**

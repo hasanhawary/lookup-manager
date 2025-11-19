@@ -199,7 +199,7 @@ class ModelLookupManager
             $select = array_merge($select, array_intersect($extra, $columns));
         }
 
-        // Select helpModelName column(s) if defined in the model
+        // Select helpModelName column if defined in the model
         if (property_exists($model, 'helpModelName') && $model->helpModelName) {
             $help = $model->helpModelName;
 
