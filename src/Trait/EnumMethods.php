@@ -4,58 +4,93 @@ namespace HasanHawary\LookupManager\Trait;
 
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
-use function Laravel\Prompts\select;
 
 trait EnumMethods
 {
-    /**
-     * Retrieves a list of enumerated values and their corresponding labels.
-     *
-     * @return array An associative array containing the enumerated values and their labels.
-     *
-     * If an exception or error occurs during the retrieval process, an empty array is returned.
-     */
     public static function getList(): array
     {
-        try {
-            return collect(array_combine(array_column(self::cases(), 'value'), array_column(self::cases(), 'name')))
-                ->map(function ($key, $value) {
-
-                    // If the value is numeric, convert it to lowercase and snake_case it
-                    if (is_numeric($value)) {
-                        $labelKey = ctype_upper($key) || count(explode('_', $key)) > 1
-                            ? strtolower($key)
-                            : Str::snake($key);
-                    } else {
-                        $labelKey = Str::snake($value);
-                    }
-
-                    // Check if the key exists in the translation file
-                    $keyName = method_exists(__class__, 'keyName')
-                        ? self::keyName()
-                        : Str::of(class_basename(self::class))
-                            ->snake()
-                            ->replaceLast('_enum', '')
-                            ->toString();
-
-                    // Translate the key and return the result
-                    $fullKeyPath = __("enums.$keyName.$labelKey");
-                    $labelValue = Str::startsWith($fullKeyPath, 'enums.') ? $labelKey : $fullKeyPath;
-
-                    return [
-                        'key' => $key,
-                        'value' => $value,
-                        'label' => $labelValue,
-                        'snake_key' => $labelKey,
-                        'icon' => method_exists(__class__, 'icon') ? self::icons()[$value] : null,
-                    ];
-                })->values()->toArray();
-
-        } catch (\Exception|\Error $e) {
-            logError($e);
-            return [];
-        }
+        return self::buildList(
+            array_combine(
+                array_column(self::cases(), 'value'),
+                array_column(self::cases(), 'name')
+            ),
+            fn ($key, $value) => self::format($key, $value)
+        );
     }
+
+    public static function getCustomList(array $data): array
+    {
+        return self::buildList(
+            $data, 
+            fn($enum, $key) => self::format($enum->name, $enum->value)
+        );
+    }
+
+    public static function getExtraList(array $data): array
+    {
+        return self::buildList(
+            $data, 
+            fn($extra, $enumValue) => self::format((self::from($enumValue))->name, $enumValue, $extra)
+        );
+    }
+
+    public static function buildList(array $data, callable $callback): array
+    {
+        if (!is_callable($callback)) {
+            [];
+        }
+
+        return collect($data)->map($callback)->values()->toArray();
+    }
+
+    private static function getLabelKey($key, $value): string
+    {
+        return is_numeric($value)
+            ? (ctype_upper($key) || \count(explode('_', $key)) > 1
+                ? strtolower($key)
+                : Str::snake($key))
+            : Str::snake($value);
+    }
+
+    private static function getKeyName(): string
+    {
+        return method_exists(__CLASS__, 'keyName')
+            ? self::keyName()
+            : Str::of(class_basename(self::class))
+                ->snake()
+                ->replaceLast('_enum', '')
+                ->toString();
+    }
+
+    private static function getExtraData(string $value, array|string|null $extra): array|string|null
+    {
+        if ($extra !== null) {
+            return $extra;
+        }
+
+        return method_exists(__CLASS__, 'extra') ? (self::extra()[$value] ?? null) : null;
+    }
+
+    private static function format($key, $value, $extra = null): array
+    {
+        $labelKey = self::getLabelKey($key, $value);
+
+        $keyName = self::getKeyName();
+
+        $fullKeyPath = __("enums.$keyName.$labelKey");
+
+        $labelValue = Str::startsWith($fullKeyPath, 'enums.') ? $labelKey : $fullKeyPath;
+
+        return [
+            'key' => $key,
+            'value' => $value,
+            'label' => $labelValue,
+            'snake_key' => $labelKey,
+            'extra' => self::getExtraData($value, $extra),
+            'icon' => method_exists(__CLASS__, 'icon') ? (self::icons()[$value] ?? null) : null,
+        ];
+    }
+
 
     /**
      * Matches a given value to its corresponding enumerated key or display value.
