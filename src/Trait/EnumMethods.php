@@ -4,10 +4,45 @@ namespace HasanHawary\LookupManager\Trait;
 
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
-
 trait EnumMethods
 {
-    public static function getLabelKey($key, $value): string
+    public static function getList(): array
+    {
+        return self::buildList(
+            array_combine(
+                array_column(self::cases(), 'value'),
+                array_column(self::cases(), 'name')
+            ),
+            fn ($key, $value) => self::format($key, $value)
+        );
+    }
+
+    public static function getCustomList(array $data): array
+    {
+        return self::buildList(
+            $data,
+            fn($enum, $key) => self::format($enum->name, $enum->value)
+        );
+    }
+
+    public static function getExtraList(array $data): array
+    {
+        return self::buildList(
+            $data,
+            fn($extra, $enumValue) => self::format((self::from($enumValue))->name, $enumValue, $extra)
+        );
+    }
+
+    public static function buildList(array $data, callable $callback): array
+    {
+        if (!is_callable($callback)) {
+            [];
+        }
+
+        return collect($data)->map($callback)->values()->toArray();
+    }
+
+    private static function getLabelKey($key, $value): string
     {
         return is_numeric($value)
             ? (ctype_upper($key) || \count(explode('_', $key)) > 1
@@ -16,7 +51,7 @@ trait EnumMethods
             : Str::snake($value);
     }
 
-    public static function getKeyName(): string
+    private static function getKeyName(): string
     {
         return method_exists(__CLASS__, 'keyName')
             ? self::keyName()
@@ -26,7 +61,7 @@ trait EnumMethods
                 ->toString();
     }
 
-    public static function getExtraData(string $value, array|string|null $extra): array|null
+    private static function getExtraData(string $value, array|string|null $extra): array|string|null
     {
         if ($extra !== null) {
             return $extra;
@@ -35,7 +70,7 @@ trait EnumMethods
         return method_exists(__CLASS__, 'extra') ? (self::extra()[$value] ?? null) : null;
     }
 
-    public static function format($key, $value, $extra = null): array
+    private static function format($key, $value, $extra = null): array
     {
         $labelKey = self::getLabelKey($key, $value);
 
@@ -55,21 +90,6 @@ trait EnumMethods
         ];
     }
 
-    public static function getList(): array
-    {
-        $data = array_combine(array_column(self::cases(), 'value'), array_column(self::cases(), 'name'));
-
-        return collect($data)->map(
-            fn ($key, $value) => self::format($key, $value)
-        )->values()->toArray();
-    }
-
-    public static function formatWithExtra(array $data): array
-    {
-        return collect($data)->map(
-            fn($value, $key) => self::format((self::from($key))->name, $key, $value)
-        )->values()->toArray();
-    }
 
     /**
      * Matches a given value to its corresponding enumerated key or display value.
