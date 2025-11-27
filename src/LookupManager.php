@@ -2,9 +2,6 @@
 
 namespace HasanHawary\LookupManager;
 
-use App\Http\Requests\Global\Help\HelpEnumRequest;
-use App\Http\Requests\Global\Help\HelpModelRequest;
-
 class LookupManager
 {
     public function __construct(

@@ -2,7 +2,6 @@
 
 namespace HasanHawary\LookupManager;
 
-use Error;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Illuminate\Support\Facades\Log;

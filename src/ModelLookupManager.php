@@ -110,7 +110,8 @@ class ModelLookupManager
 
         foreach (Arr::wrap($scopes) as $key => $scope) {
             try {
-                if (!method_exists($model, $scope)) {
+                $method = Str::camel($scope);
+                if (!method_exists($model, "scope{$method}")) {
                     Log::warning("Scope method '{$scope}' not found on model " . get_class($model));
                     continue;
                 }
