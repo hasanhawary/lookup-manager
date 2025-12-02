@@ -33,7 +33,7 @@ class LookupManager
     /**
      * Delegate to EnumLookupManager
      */
-    public function getConfig(array $data): array
+    public function getConfigs(array $data): array
     {
         return $this->configManager->getConfigs($data);
     }
