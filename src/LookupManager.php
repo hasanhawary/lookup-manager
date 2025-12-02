@@ -7,9 +7,11 @@ class LookupManager
     public function __construct(
         private ?EnumLookupManager $enumManager = null,
         private ?ModelLookupManager $modelManager = null,
+        private ?ConfigLookupManager $configManager = null,
     ) {
         $this->enumManager = $enumManager ?? new EnumLookupManager();
         $this->modelManager = $modelManager ?? new ModelLookupManager();
+        $this->configManager = $configManager ?? new ConfigLookupManager();
     }
 
     /**
@@ -26,5 +28,13 @@ class LookupManager
     public function getEnums(array $data): array
     {
         return $this->enumManager->getEnums($data);
+    }
+
+    /**
+     * Delegate to EnumLookupManager
+     */
+    public function getConfig(array $data): array
+    {
+        return $this->configManager->getConfigs($data);
     }
 }

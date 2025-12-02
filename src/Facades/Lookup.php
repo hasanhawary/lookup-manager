@@ -8,7 +8,9 @@ use Illuminate\Support\Facades\Facade;
 /**
  * @method static array getModels(array $tables)
  * @method static array getEnums(?array $enums = null)
+ * @method static array getConfigs(array $configs)
  */
+
 class Lookup extends Facade
 {
     protected static function getFacadeAccessor(): string
