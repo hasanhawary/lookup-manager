@@ -46,7 +46,6 @@ class EnumLookupManager
 				];
 			} catch (\Throwable $e) {
 				Log::error("Failed to get enum [{$enum['name']}] using {$enumPath}::{$method}(): {$e->getMessage()}");
-				dd("Failed to get enum [{$enum['name']}] using {$enumPath}::{$method}(): {$e->getMessage()}");
 
 				return [$enum['name'] => []];
 			}
@@ -57,9 +56,13 @@ class EnumLookupManager
 	private function getDefaultEnums(): array
 	{
 		$result = [];
+		$final = [];
 		$this->resolveFilesFromDir(app_path('Enum'), $result);
 		collect($result)->each(function ($enum, $name) use (&$final) {
-			$className = class_basename($enum);
+			$className = Str::of($name)
+				->replace(['Enum', ''])
+				->snake()
+				->toString();
 
 			if (class_exists($enum)) {
 				$final[] = ['label' => __('lookup.enums.' . $className), 'key' => $name];
