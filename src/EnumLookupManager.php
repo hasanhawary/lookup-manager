@@ -60,10 +60,9 @@ class EnumLookupManager
 		$this->resolveFilesFromDir(app_path('Enum'), $result);
 		collect($result)->each(function ($enum, $name) use (&$final) {
 			$className = class_basename($enum);
-			$translationKey = Str::snake(str_replace('Enum', '', $className));
 
 			if (class_exists($enum)) {
-				$final[] = ['label' => __('lookup.enums.' . $translationKey), 'key' => $name];
+				$final[] = ['label' => __('lookup.enums.' . $className), 'key' => $name];
 			}
 		});
 
