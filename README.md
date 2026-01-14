@@ -14,6 +14,7 @@ A lightweight, framework-friendly **Laravel** package for dynamic **model lookup
 ### Model Lookup Features
 
 * Fetch dynamic lookup lists from **Eloquent models** with `Lookup::getModels()`.
+* **Get all models metadata** with translated names using `Lookup::getModels([])` or when no tables are specified.
 * Apply **Eloquent scopes** with optional parameters.
 * Include **extra fields** beyond `id` and default name fields.
 * Automatic **name mapping** using prioritized fields:
@@ -63,6 +64,7 @@ class Country extends Model {
 * Supports **module-based enums**: `Modules\Blog\App\Enum\BarEnum`.
 * Call **default `getList()`** or any **custom static method** using `Lookup::getEnums()`.
 * Returns fully structured arrays including: `key`, `value`, `label`, `snake_key`, `icon`, `extra`.
+* **Get all enums metadata** with translated labels using `Lookup::getEnums([])` or when no enums are specified.
 * Logs errors if the enum class or method is missing.
 
 Example return:
@@ -133,6 +135,14 @@ $models = Lookup::getModels([
         'name' => 'roles',  // simple lookup
     ],
 ]);
+
+// Or fetch all models metadata with translated names:
+$allModels = Lookup::getModels([]);
+// Returns: [
+//   ['name' => 'Users', 'model' => 'User', 'table' => 'users'],
+//   ['name' => 'Posts', 'model' => 'Post', 'table' => 'posts'],
+//   ...
+// ]
 ```
 
 ---
@@ -173,8 +183,13 @@ $enums = Lookup::getEnums([
     ['name' => 'bar', 'module' => 'blog'], // Modules\Blog\App\Enum\BarEnum::getList()
 ]);
 
-// Or fetch all enums automatically:
-$allEnums = Lookup::getEnums();
+// Or fetch all enums metadata with translated labels:
+$allEnums = Lookup::getEnums([]);
+// Returns: [
+//   ['label' => 'Status', 'key' => 'user.status'],
+//   ['label' => 'User Roles', 'key' => 'user.role'],
+//   ...
+// ]
 ```
 
 ---
@@ -238,6 +253,99 @@ Enums:
   ]
 }
 ```
+
+---
+
+## 🌐 Localization Support
+
+The package supports **translation** for both **models** and **enums** through Laravel's localization system.
+
+### Setup Translation Files
+
+Create a `lookup.php` file in your `lang` directory (e.g., `lang/en/lookup.php` or `lang/ar/lookup.php`):
+
+```php
+<?php
+
+return [
+    'models' => [
+        'User' => 'Users',
+        'Post' => 'Posts',
+        'Category' => 'Categories',
+        'Country' => 'Countries',
+        // Add your model translations here
+    ],
+    
+    'enums' => [
+        'StatusEnum' => 'Status',
+        'RoleEnum' => 'User Roles',
+        'TypeEnum' => 'Types',
+        // Add your enum translations here
+    ],
+];
+```
+
+### Usage Examples
+
+#### Getting All Models Metadata
+
+When you call `Lookup::getModels()` without specifying tables (or with an empty array), it returns metadata for all available models with translated names:
+
+```php
+$modelsMetadata = Lookup::getModels([]);
+// Returns:
+// [
+//   ['name' => 'Users', 'model' => 'User', 'table' => 'users'],
+//   ['name' => 'Posts', 'model' => 'Post', 'table' => 'posts'],
+//   ['name' => 'Categories', 'model' => 'Category', 'table' => 'categories'],
+// ]
+```
+
+This is useful for building dynamic forms, dropdowns, or admin panels where you need a list of all available models.
+
+#### Getting All Enums Metadata
+
+When you call `Lookup::getEnums()` without specifying enums (or with an empty array), it returns metadata for all discovered enums with translated labels:
+
+```php
+$enumsMetadata = Lookup::getEnums([]);
+// Returns:
+// [
+//   ['label' => 'Status', 'key' => 'user.status'],
+//   ['label' => 'User Roles', 'key' => 'user.role'],
+//   ['label' => 'Types', 'key' => 'product.type'],
+// ]
+```
+
+This provides a complete list of all enums in your application with human-readable labels.
+
+### Translation Keys
+
+The package uses the following translation key patterns:
+
+* **Models**: `lookup.models.{ClassName}`
+  * Example: `lookup.models.User` → `'Users'`
+  
+* **Enums**: `lookup.enums.{ClassName}`
+  * Example: `lookup.enums.StatusEnum` → `'Status'`
+
+**Fallback behavior:** If no translation is found, the package will use the original class name.
+
+### Multi-language Support
+
+You can create separate translation files for each language:
+
+```
+lang/
+├── en/
+│   └── lookup.php    # English translations
+├── ar/
+│   └── lookup.php    # Arabic translations
+└── es/
+    └── lookup.php    # Spanish translations
+```
+
+The package will automatically use the current application locale set in `config/app.php` or via `App::setLocale()`.
 
 ---
 
