@@ -5,7 +5,8 @@
 [![PHP Version](https://img.shields.io/packagist/php-v/hasanhawary/lookup-manager.svg)](https://packagist.org/packages/hasanhawary/lookup-manager)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-A lightweight, framework-friendly **Laravel** package for dynamic **model lookups**, **enum discovery**, and **translation-aware enum lists**.
+A lightweight, framework-friendly **Laravel** package for dynamic **model lookups**, **enum discovery**, and *
+*translation-aware enum lists**.
 
 ---
 
@@ -32,8 +33,8 @@ class Country extends Model {
 
 * Supports **searching/filtering**:
 
-  * Accepts a **string** or an **array** with `'term'` and optional `'fields'`.
-  * Defaults to name fields if `'fields'` not provided.
+    * Accepts a **string** or an **array** with `'term'` and optional `'fields'`.
+    * Defaults to name fields if `'fields'` not provided.
 
 * Supports **pagination** with `per_page` and `page`.
 
@@ -168,7 +169,8 @@ Output:
 ]
 ```
 
-**Fallback behavior:** If `$helpModelName` is not defined, Lookup Manager will use the prioritized default name fields (`display_name`, `title`, `label`, `name`, `first_name + last_name`).
+**Fallback behavior:** If `$helpModelName` is not defined, Lookup Manager will use the prioritized default name fields (
+`display_name`, `title`, `label`, `name`, `first_name + last_name`).
 
 ---
 
@@ -202,6 +204,7 @@ $allEnums = Lookup::getEnums([]);
 Route::prefix('help')->name('help.')->group(function () {
     Route::post('models', [HelpController::class, 'models']);
     Route::post('enums', [HelpController::class, 'enums']);
+    Route::post('configs', [HelpController::class, 'configs']);
 });
 ```
 
@@ -219,6 +222,10 @@ class HelpController extends Controller
     public function enums(HelpEnumRequest $request) {
         return response()->json(Lookup::getEnums($request->all()));
     }
+    
+    public function configs(HelpEnumRequest $request) {
+        return response()->json(Lookup::getConfigs($request->all()));
+    }
 }
 ```
 
@@ -229,16 +236,28 @@ Models:
 ```json
 {
   "tables": [
-    {
-      "name": "users",
-      "scopes": ["active"],
-      "extra": ["email"],
-      "paginate": true,
-      "per_page": 15,
-      "page": 1,
-      "search": {"term": "John", "fields": ["name", "email"]}
-    },
-    {"name": "roles"}
+	{
+	  "name": "users",
+	  "scopes": [
+		"active"
+	  ],
+	  "extra": [
+		"email"
+	  ],
+	  "paginate": true,
+	  "per_page": 15,
+	  "page": 1,
+	  "search": {
+		"term": "John",
+		"fields": [
+		  "name",
+		  "email"
+		]
+	  }
+	},
+	{
+	  "name": "roles"
+	}
   ]
 }
 ```
@@ -248,9 +267,39 @@ Enums:
 ```json
 {
   "enums": [
-    {"name": "user.status"},
-    {"name": "bar", "module": "blog"}
+	{
+	  "name": "user.status"
+	},
+	{
+	  "name": "bar",
+	  "module": "blog"
+	}
   ]
+}
+```
+
+Configs:
+
+**Response Example**:
+
+```json
+{
+  "data": {
+	"notifications": {
+	  "channels": {
+		"push": {
+		  "enabled": true,
+		  "driver": "fcm",
+		  "timeout": 30,
+		  "retry": 3,
+		  "required_data": [
+			"title",
+			"body"
+		  ]
+		}
+	  }
+	}
+  }
 }
 ```
 
@@ -289,7 +338,8 @@ return [
 
 #### Getting All Models Metadata
 
-When you call `Lookup::getModels()` without specifying tables (or with an empty array), it returns metadata for all available models with translated names:
+When you call `Lookup::getModels()` without specifying tables (or with an empty array), it returns metadata for all
+available models with translated names:
 
 ```php
 $modelsMetadata = Lookup::getModels([]);
@@ -305,7 +355,8 @@ This is useful for building dynamic forms, dropdowns, or admin panels where you 
 
 #### Getting All Enums Metadata
 
-When you call `Lookup::getEnums()` without specifying enums (or with an empty array), it returns metadata for all discovered enums with translated labels:
+When you call `Lookup::getEnums()` without specifying enums (or with an empty array), it returns metadata for all
+discovered enums with translated labels:
 
 ```php
 $enumsMetadata = Lookup::getEnums([]);
@@ -324,10 +375,10 @@ This provides a complete list of all enums in your application with human-readab
 The package uses the following translation key patterns:
 
 * **Models**: `lookup.models.{ClassName}`
-  * Example: `lookup.models.User` → `'Users'`
-  
+    * Example: `lookup.models.User` → `'Users'`
+
 * **Enums**: `lookup.enums.{ClassName}`
-  * Example: `lookup.enums.StatusEnum` → `'Status'`
+    * Example: `lookup.enums.StatusEnum` → `'Status'`
 
 **Fallback behavior:** If no translation is found, the package will use the original class name.
 
@@ -346,6 +397,36 @@ lang/
 ```
 
 The package will automatically use the current application locale set in `config/app.php` or via `App::setLocale()`.
+
+---
+
+## 🔒 Security Best Practices
+
+### Config Whitelist Configuration
+
+The config lookup feature uses a whitelist approach for maximum security:
+
+1. **Define allowed configs** in `config/lookup.php`:
+
+```php
+'allowed_configs' => [
+    'app' => ['name', 'env', 'locale', 'timezone'],  // Specific keys only
+    'custom' => [],                                   // All keys allowed
+]
+```
+
+2. **Never whitelist sensitive data**:
+
+* ❌ Database credentials
+* ❌ API secret keys
+* ❌ Private keys or tokens
+* ❌ Password reset tokens
+* ✅ Public API keys
+* ✅ Application metadata
+* ✅ Non-sensitive settings
+
+3. **Monitor logs** for unauthorized access attempts - the package logs warnings when non-whitelisted configs are
+   requested.
 
 ---
 
