@@ -25,5 +25,35 @@ return [
     */
 
     'allowed_configs' => [
+
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Root Excluded Models
+    |--------------------------------------------------------------------------
+    |
+    | This array defines which models should automatically have the
+    | "excludeRoot" scope applied when querying.
+    |
+    | Any model listed here must implement a scope method named `scopeExcludeRoot`
+    | in order for this functionality to work correctly.
+    |
+    | Examples:
+    | App\Models\User::class
+    | App\Models\Role::class
+    |
+    | Notes:
+    | - This allows centralizing the logic for filtering out "root" records.
+    | - You can add models from your App\Models namespace or from modules.
+    | - Avoid adding models that do not implement the `scopeExcludeRoot` method.
+    |
+    */
+    'root_excluded_models' => [
+        App\Models\Central\Admin::class,
+        App\Models\Central\Role::class,
+        App\Models\Admin::class,
+        App\Models\User::class,
+        App\Models\Role::class,
+    ]
 ];

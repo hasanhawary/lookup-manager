@@ -2,15 +2,12 @@
 
 namespace HasanHawary\LookupManager;
 
-use App\Models\Role;
-use App\Models\User;
 use Error;
 use Exception;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
-use RuntimeException;
 use Illuminate\Database\Eloquent\Model;
 
 class ModelLookupManager
@@ -102,11 +99,15 @@ class ModelLookupManager
 
 	private function applyScopes(&$model, $scopes = null, $values = null): void
 	{
-		if ($model instanceof User || $model instanceof Role) {
-			if (method_exists($model, 'scopeExcludeRoot')) {
-				$model = $model->excludeRoot();
-			}
-		}
+        if (in_array(get_class($model), config('models.root_excluded_models', []), true) &&
+            method_exists($model, 'excludeRoot')
+        ) {
+            $model = $model->excludeRoot();
+        }
+
+        if (method_exists($model, 'scopeActive')) {
+            $model = $model->active();
+        }
 
 		foreach (Arr::wrap($scopes) as $key => $scope) {
 			try {
@@ -246,7 +247,6 @@ class ModelLookupManager
 			}
 		}
 
-
 		// If nameModel is defined and refers to one or more columns, build name using those columns' values
 		if ($nameModel) {
 			if (is_array($nameModel)) {
@@ -277,17 +277,27 @@ class ModelLookupManager
 		return $data;
 	}
 
-	private function resolveModel(string $name, $module): ?object
-	{
-		$model = collect(explode('_', $name))
-			->map(fn($i) => ucfirst(Str::camel(Str::singular($i))))->join('');
+    private function resolveModel(string $name, ?string $module = null): ?object
+    {
+        $parts = explode('.', $name);
+        $modelName = array_pop($parts);
 
-		$modelPath = !empty($module)
-			? "Modules\\" . ucfirst(Str::camel($module)) . "\\App\\Models\\{$model}"
-			: "App\\Models\\{$model}";
+        $model = Str::studly(Str::singular($modelName));
 
-		return class_exists($modelPath) ? new $modelPath() : null;
-	}
+        $folders = collect($parts)
+            ->map(fn ($part) => Str::studly($part))
+            ->implode('\\');
+
+        // Base namespace
+        $baseNamespace = empty($module)
+            ? 'App\\Models'
+            : 'Modules\\' . Str::studly($module) . '\\App\\Models';
+
+        // Build final class path
+        $modelPath = $baseNamespace . ($folders ? "\\{$folders}" : '') . "\\{$model}";
+
+        return class_exists($modelPath) ? app($modelPath) : null;
+    }
 
 	private function resolveDefaultName($record)
 	{
