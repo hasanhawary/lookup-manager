@@ -1,21 +1,22 @@
 <?php
 
-
-namespace HasanHawary\LookupManager;
+namespace HasanHawary\lookupBuilder;
 
 use Illuminate\Support\ServiceProvider;
 
 class LookupManagerServiceProvider extends ServiceProvider
 {
-    public function register(): void
-    {
-        $this->app->singleton('lookup-manager', function ($app) {
-            return new LookupManager();
-        });
-    }
-
     public function boot(): void
     {
-        // Nothing to boot for now.
+        // Publish the default config files
+        $this->publishes([
+            __DIR__ . '/../config/lookup.php' => config_path('lookup.php'),
+        ], 'lookup-manager-config');
+    }
+
+    public function register(): void
+    {
+        // Merge package config
+        $this->mergeConfigFrom(__DIR__ . '/../config/lookup.php', 'lookup');
     }
 }

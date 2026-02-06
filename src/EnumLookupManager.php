@@ -19,6 +19,7 @@ class EnumLookupManager
 		if (isset($request['enums']) && !is_array($request['enums'])) {
 			throw new RuntimeException("The 'enums' key must be an array.");
 		}
+
 		// Use defaults if 'enums' not provided
 		if (!isset($request['enums']) || empty($request['enums'])) {
 			return array_merge($this->getDefaultEnums(), $this->getDefaultModuleEnums());
@@ -39,6 +40,7 @@ class EnumLookupManager
 			$method = !empty($enum['method'])
 				? Str::camel($enum['method'])
 				: 'getList';
+
 			try {
 				// Call the static method dynamically
 				return [

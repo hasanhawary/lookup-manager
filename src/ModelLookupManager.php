@@ -357,7 +357,7 @@ class ModelLookupManager
 
 				// Return only table name and model class without data
 				$result[] = [
-					'name' => __('lookup.models.'.Str::snake($tableName)),
+					'name' => resolveTrans($tableName, 'lookup.models', snaked:false),
 					'model' => $modelName,
 					'table' => $tableName,
 				];
