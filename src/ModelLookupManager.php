@@ -99,11 +99,10 @@ class ModelLookupManager
 
     private function applyScopes(&$model, $scopes = null, $values = null): void
     {
-        // Exclude root (only once, safe)
+        // Exclude root if founded
         if (
-            $model instanceof Model &&
             in_array(get_class($model), config('models.root_excluded_models', []), true) &&
-            method_exists($model, 'excludeRoot')
+            $model->hasNamedScope('excludeRoot')
         ) {
             $model = $model->excludeRoot();
         }
