@@ -97,40 +97,46 @@ class ModelLookupManager
 		return $result;
 	}
 
-	private function applyScopes(&$model, $scopes = null, $values = null): void
-	{
-        if (in_array(get_class($model), config('models.root_excluded_models', []), true) &&
+    private function applyScopes(&$model, $scopes = null, $values = null): void
+    {
+        // Exclude root (only once, safe)
+        if (
+            $model instanceof Model &&
+            in_array(get_class($model), config('models.root_excluded_models', []), true) &&
             method_exists($model, 'excludeRoot')
         ) {
             $model = $model->excludeRoot();
         }
 
-        if (method_exists($model, 'scopeActive')) {
+        // Always apply active scope if exists
+        if ($model->hasNamedScope('active')) {
             $model = $model->active();
         }
 
-		foreach (Arr::wrap($scopes) as $key => $scope) {
-			try {
-				$method = Str::camel($scope);
-				if (!method_exists($model, "scope{$method}")) {
-					Log::warning("Scope method '{$scope}' not found on model " . get_class($model));
-					continue;
-				}
+        foreach (Arr::wrap($scopes) as $key => $scope) {
+            try {
+                if (!$model->hasNamedScope($scope)) {
+                    Log::warning(
+                        "Scope '{$scope}' not found on model " . get_class($model->getModel())
+                    );
+                    continue;
+                }
 
-				// Determine matching value
-				$value = $values[$scope] ?? $values[$key] ?? null;
+                // Determine value (allow 0 / false)
+                $value = $values[$scope] ?? $values[$key] ?? null;
 
-				// allow 0/"0"/false as valid values — only treat null as absent
-				$model = $value !== null
-					? $model->$scope(...Arr::wrap($value))
-					: $model->$scope();
+                $model = $value !== null
+                    ? $model->$scope(...Arr::wrap($value))
+                    : $model->$scope();
 
-			} catch (Exception|Error $e) {
-				Log::error("Error applying scope '{$scope}' on model " . get_class($model) . ": " . $e->getMessage());
-				continue;
-			}
-		}
-	}
+            } catch (\Throwable $e) {
+                Log::error(
+                    "Error applying scope '{$scope}' on model " .
+                    get_class($model->getModel()) . ': ' . $e->getMessage()
+                );
+            }
+        }
+    }
 
 	private function applySearch(&$model, array|string|null $search): void
 	{
