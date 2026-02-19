@@ -102,7 +102,7 @@ class ModelLookupManager
         // Exclude root if founded
         if (
             in_array(get_class($model), config('lookup.root_excluded_models', []), true) &&
-            $model->hasNamedScope('scopeExcludeRoot')
+            method_exists($model, 'scopeExcludeRoot')
         ) {
             $model = $model->excludeRoot();
         }
