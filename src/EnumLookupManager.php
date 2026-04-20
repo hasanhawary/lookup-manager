@@ -27,14 +27,22 @@ class EnumLookupManager
 
 		return collect($request['enums'])->mapWithKeys(function ($enum) {
 			$name = implode('\\', array_map(fn($i) => ucfirst(Str::camel($i)), explode('.', $enum['name'])));
+			
+			$module = !empty($enum['module']) ? ucfirst(Str::camel($enum['module'])) : null;
+			
+			$possiblePaths = $module ? [
+				"Modules\\{$module}\\App\\Enum\\{$name}Enum",   // uppercase App
+				"Modules\\{$module}\\app\\Enum\\{$name}Enum",   // lowercase app
+			] : [
+				"App\\Enum\\{$name}Enum",
+			];
 
-			$enumPath = !empty($enum['module'])
-				? 'Modules\\' . ucfirst(Str::camel($enum['module'])) . "\\App\\Enum\\{$name}Enum"
-				: "App\\Enum\\{$name}Enum";
+			// Find the first existing class
+			$enumPath = collect($possiblePaths)->first(fn($path) => class_exists($path));
 
-			// Throw exception if class does not exist
-			if (!class_exists($enumPath)) {
-				throw new RuntimeException("Enum class not found: {$enumPath}");
+			// Throw exception if none found
+			if (!$enumPath) {
+				throw new RuntimeException("Enum class not found. Tried: " . implode(', ', $possiblePaths));
 			}
 
 			$method = !empty($enum['method'])
