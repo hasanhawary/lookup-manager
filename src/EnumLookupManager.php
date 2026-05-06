@@ -26,28 +26,28 @@ class EnumLookupManager
 		}
 
 		return collect($request['enums'])->mapWithKeys(function ($enum) {
-			$name = implode('\\', array_map(fn($i) => ucfirst(Str::camel($i)), explode('.', $enum['name'])));
+            try {
+                $name = implode('\\', array_map(fn($i) => ucfirst(Str::camel($i)), explode('.', $enum['name'])));
 
-			$enumPath = !empty($enum['module'])
-				? 'Modules\\' . ucfirst(Str::camel($enum['module'])) . "\\App\\Enum\\{$name}Enum"
-				: "App\\Enum\\{$name}Enum";
+                $enumPath = !empty($enum['module'])
+                    ? 'Modules\\' . ucfirst(Str::camel($enum['module'])) . "\\App\\Enum\\{$name}Enum"
+                    : "App\\Enum\\{$name}Enum";
 
-			// Throw exception if class does not exist
-			if (!class_exists($enumPath)) {
-				throw new RuntimeException("Enum class not found: {$enumPath}");
-			}
+                // Throw exception if class does not exist
+                if (!class_exists($enumPath)) {
+                    throw new RuntimeException("Enum class not found: {$enumPath}");
+                }
 
-			$method = !empty($enum['method'])
-				? Str::camel($enum['method'])
-				: 'getList';
+			    $method = !empty($enum['method'])
+                    ? Str::camel($enum['method'])
+                    : 'getList';
 
-			try {
 				// Call the static method dynamically
 				return [
 					$enum['name'] => $enumPath::$method(),
 				];
 			} catch (\Throwable $e) {
-				Log::error("Failed to get enum [{$enum['name']}] using {$enumPath}::{$method}(): {$e->getMessage()}");
+				Log::error("Failed to get enum [{$enum['name']}]: {$e->getMessage()}");
 
 				return [$enum['name'] => []];
 			}

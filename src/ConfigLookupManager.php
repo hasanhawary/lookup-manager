@@ -53,29 +53,50 @@ class ConfigLookupManager
                     return [$name => []];
                 }
 
-                // Get whitelisted keys for this config
-                $whitelistedKeys = $whitelist[$name];
+                // Get whitelisted keys for this config and flatten any nesting
+                $whitelistedKeys = Arr::flatten((array) $whitelist[$name]);
 
-                // If whitelist is empty array, return all config data
+                // If whitelist is empty, return all config data
                 if (empty($whitelistedKeys)) {
                     return [$name => $configData];
                 }
 
                 // If specific keys are requested in the request
                 if (isset($config['keys']) && is_array($config['keys'])) {
-                    // Intersect requested keys with whitelisted keys
-                    $allowedKeys = array_intersect($config['keys'], $whitelistedKeys);
+                    // Flatten requested keys in case they are nested
+                    $requestedKeys = Arr::flatten($config['keys']);
+
+                    // Allow keys that exactly match or are children of a whitelisted key
+                    $allowedKeys = array_filter($requestedKeys, function ($requestedKey) use ($whitelistedKeys) {
+                        foreach ($whitelistedKeys as $whitelistedKey) {
+                            if ($requestedKey === $whitelistedKey || str_starts_with($requestedKey, $whitelistedKey . '.')) {
+                                return true;
+                            }
+                        }
+                        return false;
+                    });
 
                     if (empty($allowedKeys)) {
                         Log::info("No valid keys requested for config [{$name}] after whitelist filtering.");
                         return [$name => []];
                     }
 
-                    return [$name => Arr::only($configData, $allowedKeys)];
+                    // Support dot notation: e.g. "filters.cause" → nested result
+                    $result = [];
+                    foreach ($allowedKeys as $key) {
+                        Arr::set($result, $key, Arr::get($configData, $key));
+                    }
+
+                    return [$name => $result];
                 }
 
-                // No specific keys requested, return all whitelisted keys
-                return [$name => Arr::only($configData, $whitelistedKeys)];
+                // No specific keys requested — return all whitelisted keys (dot notation supported)
+                $result = [];
+                foreach ($whitelistedKeys as $key) {
+                    Arr::set($result, $key, Arr::get($configData, $key));
+                }
+
+                return [$name => $result];
 
             } catch (\Throwable $e) {
                 Log::error("Failed to get config [{$name}]: {$e->getMessage()}");
