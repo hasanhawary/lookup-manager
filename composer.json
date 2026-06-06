@@ -1,0 +1,57 @@
+{
+  "name": "hasanhawary/lookup-manager",
+  "description": "Clean Laravel lookup manager: fetch model lookups and enum lists (app and modules) with no app-coupling.",
+  "type": "library",
+  "license": "MIT",
+  "keywords": [
+    "laravel",
+    "lookup",
+    "enums",
+    "models",
+    "helpers"
+  ],
+  "authors": [
+    { "name": "Hasan Hawary", "role": "Developer" }
+  ],
+  "require": {
+    "php": ">=8.1 <8.6",
+    "illuminate/support": "^10.0 || ^11.0 || ^12.0 || ^13.0"
+  },
+  "require-dev": {
+    "orchestra/testbench": "^8.0 || ^9.0 || ^10.0 || ^11.0",
+    "phpunit/phpunit": "^10.0 || ^11.0 || ^12.0"
+  },
+  "autoload": {
+    "psr-4": {
+      "HasanHawary\\LookupManager\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "HasanHawary\\LookupManager\\Tests\\": "tests/"
+    }
+  },
+  "extra": {
+    "laravel": {
+      "providers": [
+        "HasanHawary\\LookupManager\\LookupManagerServiceProvider"
+      ],
+      "aliases": {
+        "Lookup": "HasanHawary\\LookupManager\\Facades\\Lookup"
+      }
+    }
+  },
+  "scripts": {
+    "test": "vendor/bin/phpunit"
+  },
+  "homepage": "https://github.com/hasanhawary/lookup-manager",
+  "support": {
+    "issues": "https://github.com/hasanhawary/lookup-manager/issues",
+    "source": "https://github.com/hasanhawary/lookup-manager"
+  },
+  "config": {
+    "sort-packages": true
+  },
+  "minimum-stability": "dev",
+  "prefer-stable": true
+}
