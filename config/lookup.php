@@ -125,8 +125,8 @@ return [
         'enabled' => true,
         'path' => 'Modules',
         'namespace' => 'Modules',
-        'model_namespace' => null,
-        'enum_namespace' => null,
+        'model_namespace' => 'app\Models',
+        'enum_namespace' => 'app\Enum',
     ],
 
     /*
