@@ -17,6 +17,11 @@ trait EnumMethods
         );
     }
 
+    public function selfResolve(): string
+    {
+        return self::resolve($this->value) ?? $this->name;
+    }
+
     public static function getCustomList(array $data): array
     {
         return self::buildList(
