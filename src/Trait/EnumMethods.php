@@ -88,6 +88,7 @@ trait EnumMethods
             'snake_key' => $labelKey,
             'extra' => self::getExtraData($value, $extra),
             'icon' => method_exists(static::class, 'icons') ? (static::icons()[$value] ?? null) : null,
+            'color' => method_exists(static::class, 'colors') ? (static::colors()[$value] ?? null) : null,
         ];
     }
 
